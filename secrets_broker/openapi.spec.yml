@@ -1,0 +1,52 @@
+openapi: "3.0.0"
+
+info:
+  title: GitHub Actions Secrets Broker
+  version: "0.1"
+
+paths:
+  /api/v1/initialize:
+    get:
+      summary: Initialize secrets request
+      description: Get token for github action to get secrets request validated.
+      operationId: secrets_broker.api.initialize
+      responses:
+        200:
+          description: Validation token.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  validation_token:
+                    type: string
+                required:
+                  - validation_token
+        400:
+          description: Input data error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMsg'
+        403:
+          description: GitHub repo not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMsg'
+        409:
+          description: Action ID already initialized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMsg'
+
+components:
+  schemas:
+    ErrorMsg:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
