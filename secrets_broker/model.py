@@ -12,7 +12,7 @@ class BaseModel(Model):
 
 class SecretsRequest(BaseModel):
     repo = TextField(null=False)
-    actions_id = TextField(null=False)
+    run_id = TextField(null=False)
     gh_token = TextField(null=False)
     validation_token = TextField(null=False)
     created = DateTimeField(null=False)
@@ -20,7 +20,7 @@ class SecretsRequest(BaseModel):
     class Meta:
         indexes = (
             # create a unique index
-            (('repo', 'actions_id'), True),
+            (('repo', 'run_id'), True),
         )
 
 

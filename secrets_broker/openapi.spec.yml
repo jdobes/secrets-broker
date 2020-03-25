@@ -35,7 +35,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorMsg'
         409:
-          description: Action ID already initialized.
+          description: Repo & Run ID already initialized.
           content:
             application/json:
               schema:
