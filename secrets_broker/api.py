@@ -1,15 +1,14 @@
 import os
 from datetime import datetime
-import logging
 import uuid
 import json
 
 import connexion
 
+from .log import get_logger
 from .model import SecretsRequest
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+LOGGER = get_logger(__name__)
 
 ALLOWED_GITHUB_REPOS = [repo.strip() for repo in os.getenv("ALLOWED_GITHUB_REPOS", "jdobes/secrets-broker").split(",") if repo.strip()]
 ALLOWED_GITHUB_ORGS = [org.strip() for org in os.getenv("ALLOWED_GITHUB_ORGS", "").split(",") if org.strip()]
@@ -33,6 +32,7 @@ def initialize():
 
     gh_token = connexion.request.headers.get("x-github-token", "?")
     token = uuid.uuid4().hex
+    LOGGER.debug("storing: repo=%s, actions_id=%s, gh_token=%s, validation_token=%s", repo, action_id, gh_token, token)
     record = SecretsRequest(repo=repo, actions_id=action_id, gh_token=gh_token, validation_token=token, created=datetime.now())
     record.save()
     response = {"validation_token": token}
