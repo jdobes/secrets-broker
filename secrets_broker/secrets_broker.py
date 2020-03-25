@@ -1,32 +1,29 @@
 import sys
-import logging
 
 from apscheduler.schedulers.background import BackgroundScheduler
 import connexion
 from peewee import SQL
 
 from .api import ALLOWED_GITHUB_REPOS, ALLOWED_GITHUB_ORGS, ALLOWED_GITHUB_USERS
+from .log import get_logger
 from .model import init_schema, SecretsRequest
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+LOGGER = get_logger("secrets_broker")
 
 def delete_old_requests():
     query = SecretsRequest.delete().where(SecretsRequest.created < SQL("datetime('now', '-30 seconds')"))
     deleted = query.execute()
     if deleted:
-        logger.info("%s expired request(s) deleted.", deleted)
+        LOGGER.info("%s expired request(s) deleted.", deleted)
 
 
 def main():
-    logging.basicConfig(format="%(asctime)s:%(levelname)s:%(name)s:%(message)s")
-
     if not ALLOWED_GITHUB_REPOS:
-        logger.critical("No allowed GitHub repos defined!")
+        LOGGER.critical("No allowed GitHub repos defined!")
         sys.exit(1)
     
     if not ALLOWED_GITHUB_ORGS and not ALLOWED_GITHUB_USERS:
-        logger.critical("No allowed GitHub orgs or users defined!")
+        LOGGER.critical("No allowed GitHub orgs or users defined!")
         sys.exit(1)
 
     init_schema()
@@ -34,7 +31,7 @@ def main():
     sched = BackgroundScheduler(daemon=True)
     sched.add_job(delete_old_requests, 'interval', [], seconds=10)
     sched.start()
-    logger.info("Delete scheduler enabled.")
+    LOGGER.info("Delete scheduler enabled.")
 
     app = connexion.FlaskApp(__name__, options={"swagger_ui": True, "swagger_url": "/api/v1",
                                                 "openapi_spec_path": "/api/v1/openapi.json"})
