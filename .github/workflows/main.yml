@@ -27,5 +27,11 @@ jobs:
       run: |
         URL="https://secrets-broker-vmaas-ci.5a9f.insights-dev.openshiftapps.com"
         VALIDATION_TOKEN=$(curl -s -X GET -H "x-run-id: $GITHUB_RUN_ID" -H "x-github-repo: $GITHUB_REPOSITORY" -H "x-github-token: ${{ secrets.GITHUB_TOKEN }}" $URL/api/v1/initialize | python -c "import json,sys;sys.stdout.write(json.load(sys.stdin).get('validation_token',''))")
-        echo "SECRETS-BROKER-VALIDATION $VALIDATION_TOKEN"
+    - uses: actions/upload-artifact@v1
+      with:
+        name: validation_token
+        path: /tmp/validation_token
+    - name: Run a multi-line script
+      run: |
+        URL="https://secrets-broker-vmaas-ci.5a9f.insights-dev.openshiftapps.com"
         curl -s -X GET -H "x-run-id: $GITHUB_RUN_ID" -H "x-github-repo: $GITHUB_REPOSITORY" -H "x-github-token: ${{ secrets.GITHUB_TOKEN }}" $URL/api/v1/secrets?keys=TEST_SECRET_1,TEST_SECRET_2
