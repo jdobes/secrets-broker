@@ -10,6 +10,22 @@ paths:
       summary: Initialize secrets request
       description: Get token for github action to get secrets request validated.
       operationId: secrets_broker.api.initialize
+      parameters:
+        - name: x-run-id
+          in: header
+          required: true
+          schema:
+            type: integer
+        - name: x-github-repo
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: x-github-token
+          in: header
+          required: true
+          schema:
+            type: string
       responses:
         200:
           description: Validation token.
@@ -22,12 +38,6 @@ paths:
                     type: string
                 required:
                   - validation_token
-        400:
-          description: Input data error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorMsg'
         403:
           description: GitHub repo not allowed.
           content:
@@ -36,6 +46,57 @@ paths:
                 $ref: '#/components/schemas/ErrorMsg'
         409:
           description: Repo & Run ID already initialized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMsg'
+
+  /api/v1/secrets:
+    get:
+      summary: Get Secrets
+      description: Get list of secrets.
+      operationId: secrets_broker.api.secrets
+      parameters:
+        - name: x-run-id
+          in: header
+          required: true
+          schema:
+            type: integer
+        - name: x-github-repo
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: x-github-token
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: keys
+          description: Comma-separated secret names
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: List of secrets.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    key:
+                      type: string
+                    value:
+                      type: string
+                  required:
+                    - key
+                    - value
+        403:
+          description: Access to secrets forbidden.
           content:
             application/json:
               schema:

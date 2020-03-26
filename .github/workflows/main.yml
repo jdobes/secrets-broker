@@ -28,3 +28,4 @@ jobs:
         URL="https://secrets-broker-vmaas-ci.5a9f.insights-dev.openshiftapps.com"
         VALIDATION_TOKEN=$(curl -s -X GET -H "x-run-id: $GITHUB_RUN_ID" -H "x-github-repo: $GITHUB_REPOSITORY" -H "x-github-token: ${{ secrets.GITHUB_TOKEN }}" $URL/api/v1/initialize | python -c "import json,sys;sys.stdout.write(json.load(sys.stdin).get('validation_token',''))")
         echo "SECRETS-BROKER-VALIDATION $VALIDATION_TOKEN"
+        curl -s -X GET -H "x-run-id: $GITHUB_RUN_ID" -H "x-github-repo: $GITHUB_REPOSITORY" -H "x-github-token: ${{ secrets.GITHUB_TOKEN }}" $URL/api/v1/secrets?keys=TEST_SECRET_1,TEST_SECRET_2

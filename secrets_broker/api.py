@@ -4,6 +4,7 @@ import uuid
 import json
 
 import connexion
+import requests
 
 from .log import get_logger
 from .model import SecretsRequest
@@ -16,13 +17,17 @@ ALLOWED_GITHUB_USERS = [user.strip() for user in os.getenv("ALLOWED_GITHUB_USERS
 
 SECRETS = json.loads(os.getenv("SECRETS", "{}"))
 
-def initialize():
-    try:
-        run_id = int(connexion.request.headers.get("x-run-id", "?"))
-    except ValueError:
-        return {"error": "Run ID missing or invalid."}, 400
+GITHUB_API = "https://api.github.com"
+GITHUB_API_RUN_ENDPOINT = "/repos/%s/actions/runs/%s"
+GITHUB_API_LOG_ENDPOINT = "/repos/%s/actions/runs/%s/logs"
+GITHUB_API_USER_ORGS_ENDPOINT = "/users/%s/orgs"
 
-    repo = connexion.request.headers.get("x-github-repo", "?")
+
+def initialize():
+    run_id = connexion.request.headers["x-run-id"]
+    repo = connexion.request.headers["x-github-repo"]
+    gh_token = connexion.request.headers["x-github-token"]
+
     if repo not in ALLOWED_GITHUB_REPOS:
         return {"error": "GitHub repo not specified or allowed."}, 403
 
@@ -30,11 +35,50 @@ def initialize():
     if secrets_request:
         return {"error": "Repo & Run ID already initialized."}, 409
 
-    gh_token = connexion.request.headers.get("x-github-token", "?")
     token = uuid.uuid4().hex
-    LOGGER.info("Received initialization request from repo: %s (run ID %s)", repo, run_id)
     LOGGER.debug("storing: repo=%s, run_id=%s, gh_token=%s, validation_token=%s", repo, run_id, gh_token, token)
     record = SecretsRequest(repo=repo, run_id=run_id, gh_token=gh_token, validation_token=token, created=datetime.now())
     record.save()
-    response = {"validation_token": token}
-    return response
+    return {"validation_token": token}
+
+
+def secrets():
+    run_id = connexion.request.headers["x-run-id"]
+    repo = connexion.request.headers["x-github-repo"]
+    gh_token = connexion.request.headers["x-github-token"]
+
+    if repo not in ALLOWED_GITHUB_REPOS:
+        return {"error": "GitHub repo not specified or allowed."}, 403
+    
+    secrets_request = SecretsRequest.get_or_none((SecretsRequest.run_id == run_id) & 
+                                                 (SecretsRequest.repo == repo) &
+                                                 (SecretsRequest.gh_token == gh_token))
+    if not secrets_request:
+        return {"error": "Secrets request not initialized."}, 403
+
+    # check github API about run origin
+    response = requests.get("%s%s" % (GITHUB_API, GITHUB_API_RUN_ENDPOINT % (repo, run_id)),
+                            headers={"Authorization": "token %s" % gh_token})
+    if response.status_code != 200:
+        return {"error": "Validation failed."}, 403
+    run_detail = response.json()
+    head_repository_name = run_detail["head_repository"]["full_name"]
+    user_login = run_detail["head_repository"]["owner"]["login"]
+    if head_repository_name == repo:
+        LOGGER.debug("Initiator's head repo is allowed repo: %s" % repo)
+    elif user_login in ALLOWED_GITHUB_USERS:
+        LOGGER.debug("Initiator's head repo owner is in alowed users: %s." % user_login)
+    else:  # check user's org
+        response = requests.get("%s%s" % (GITHUB_API, GITHUB_API_USER_ORGS_ENDPOINT % (user_login)),
+                                headers={"Authorization": "token %s" % gh_token})
+        if response.status_code != 200:
+            return {"error": "Validation failed."}, 403
+        org_list = response.json()
+        valid_orgs = [org["login"] for org in org_list if org["login"] in ALLOWED_GITHUB_ORGS]
+        if not valid_orgs:
+            return {"error": "Validation failed."}, 403
+
+    # TODO: check token in log
+
+    requested_keys = [key.strip() for key in connexion.request.args["keys"].split(",") if key.strip()]
+    return [{"key": key, "value": SECRETS[key]} for key in requested_keys if key in SECRETS]
