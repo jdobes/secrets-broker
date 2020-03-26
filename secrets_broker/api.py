@@ -2,6 +2,8 @@ import os
 from datetime import datetime
 import uuid
 import json
+from io import BytesIO
+from zipfile import ZipFile
 
 import connexion
 import requests
@@ -19,7 +21,7 @@ SECRETS = json.loads(os.getenv("SECRETS", "{}"))
 
 GITHUB_API = "https://api.github.com"
 GITHUB_API_RUN_ENDPOINT = "/repos/%s/actions/runs/%s"
-GITHUB_API_LOG_ENDPOINT = "/repos/%s/actions/runs/%s/logs"
+GITHUB_API_ARTIFACT_ENDPOINT = "/repos/%s/actions/runs/%s/artifacts"
 GITHUB_API_USER_ORGS_ENDPOINT = "/users/%s/orgs"
 
 
@@ -88,7 +90,27 @@ def secrets():
         LOGGER.debug("Permission denied for owner: login=%s, type=%s.", owner_login, owner_type)
         return {"error": "Validation failed."}, 403
 
-    # TODO: check token in log
+    # check token in artifacts
+    response = requests.get("%s%s" % (GITHUB_API, GITHUB_API_ARTIFACT_ENDPOINT % (repo, run_id)),
+                            #allow_redirects=True,
+                            headers={"Authorization": "token %s" % gh_token})
+    if response.status_code != 200:
+        LOGGER.debug("Invalid HTTP code from Github: %s", response.status_code)
+        return {"error": "Validation failed."}, 403
+    
+    artifacts = response.json()
+    for a in artifacts.get("artifacts", []):
+        LOGGER.debug(a["name"])
+    artifacts_download_urls = [artifact["archive_download_url"] for artifact in artifacts.get("artifacts", []) if artifact["name"] == "validation_token"]
+    if not artifacts_download_urls:
+        LOGGER.debug("No artifact found")
+        return {"error": "Validation failed."}, 403
+    
+    artifacts_download_url = artifacts_download_urls[0]
+
+    #zipfile = ZipFile(BytesIO(response.content))
+    #for zip_file in zipfile.namelist():
+    #    LOGGER.debug(zip_file)
 
     LOGGER.debug("Permission granted: login=%s, type=%s.", owner_login, owner_type)
     requested_keys = [key.strip() for key in connexion.request.args["keys"].split(",") if key.strip()]
